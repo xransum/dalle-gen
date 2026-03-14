@@ -1,0 +1,49 @@
+{
+  "name": "dalle-gen",
+  "version": "1.0.0",
+  "description": "CLI tool for generating images with DALL-E via OpenAI API",
+  "type": "module",
+  "bin": {
+    "dalle-gen": "./bin/dalle-gen.js"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,json,md}\""
+  },
+  "dependencies": {
+    "openai": "^4.77.0",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "eslint": "^10.0.3",
+    "prettier": "^3.8.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT",
+  "author": "xransum",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xransum/dalle-gen.git"
+  },
+  "homepage": "https://github.com/xransum/dalle-gen#readme",
+  "bugs": {
+    "url": "https://github.com/xransum/dalle-gen/issues"
+  },
+  "keywords": [
+    "dalle",
+    "dall-e",
+    "openai",
+    "image-generation",
+    "cli",
+    "ai"
+  ]
+}
