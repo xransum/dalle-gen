@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { createWriteStream, mkdirSync, unlink } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve as resolvePath, dirname } from "node:path";
 import https from "node:https";
 import { VALID_SIZES, VALID_MODELS, VALID_QUALITIES, VALID_STYLES } from "./constants.js";
 
@@ -133,7 +133,7 @@ export async function generateImage(options) {
     throw new Error("OpenAI returned no image URL.");
   }
 
-  const destPath = resolve(output);
+  const destPath = resolvePath(output);
   const outputDir = dirname(destPath);
   mkdirSync(outputDir, { recursive: true });
 
