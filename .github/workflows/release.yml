@@ -13,25 +13,101 @@ jobs:
       contents: write
 
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      released: ${{ steps.bump.outputs.released }}
+      tag: ${{ steps.bump.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v6
-
-      - uses: googleapis/release-please-action@v4
-        id: release
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          config-file: release-config.json
-          manifest-file: .release-manifest.json
-          skip-github-pull-request: true
+          fetch-depth: 0
+
+      - name: Compute version bump
+        id: bump
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find the last semver tag, default to v0.0.0 if none exists.
+          LAST_TAG=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG="v0.0.0"
+            COMMITS=$(git log --format="%s" HEAD)
+          else
+            COMMITS=$(git log --format="%s" "${LAST_TAG}..HEAD")
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            echo "No commits since $LAST_TAG -- nothing to release."
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Determine bump level from conventional commits.
+          BUMP="none"
+          while IFS= read -r msg; do
+            if echo "$msg" | grep -qE '!(\(.*\))?:|BREAKING.CHANGE'; then
+              BUMP="major"
+              break
+            elif echo "$msg" | grep -qE '^feat(\(.*\))?:'; then
+              [ "$BUMP" != "major" ] && BUMP="minor"
+            elif echo "$msg" | grep -qE '^fix(\(.*\))?:'; then
+              [ "$BUMP" = "none" ] && BUMP="patch"
+            fi
+          done <<< "$COMMITS"
+
+          if [ "$BUMP" = "none" ]; then
+            echo "No releasable commits since $LAST_TAG -- nothing to release."
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Parse current version from package.json.
+          CURRENT=$(node -p "require('./package.json').version")
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3)
+
+          if [ "$BUMP" = "major" ]; then
+            MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+          elif [ "$BUMP" = "minor" ]; then
+            MINOR=$((MINOR + 1)); PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          TAG="v${NEW_VERSION}"
+          echo "Bumping $CURRENT -> $NEW_VERSION ($BUMP)"
+
+          # Update package.json.
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${NEW_VERSION}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          # Commit, tag, push.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: release ${TAG}"
+          git tag "${TAG}"
+          git push origin main --follow-tags
+
+          # Create GitHub Release.
+          NOTES=$(git log --format="- %s" "${LAST_TAG}..HEAD~1")
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes "${NOTES}"
+
+          echo "released=true" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
     needs: release
-    if: ${{ needs.release.outputs.release_created == 'true' }}
+    if: ${{ needs.release.outputs.released == 'true' }}
 
     permissions:
       contents: read
@@ -40,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.release.outputs.tag_name }}
+          ref: ${{ needs.release.outputs.tag }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
