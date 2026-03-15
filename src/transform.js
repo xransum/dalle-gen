@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { writeFile } from "node:fs/promises";
 
 /**
  * Resize and/or center-crop an image in place using sharp.
@@ -15,13 +16,15 @@ import sharp from "sharp";
  * @returns {Promise<void>}
  */
 export async function resizeImage({ filePath, resize = null, crop = null, verbose = false }) {
-  if (!resize && !crop) {return;}
+  if (!resize && !crop) {
+    return;
+  }
 
   let pipeline = sharp(filePath);
   const meta = await pipeline.metadata();
 
   if (crop) {
-    const srcWidth  = meta.width  ?? 0;
+    const srcWidth = meta.width ?? 0;
     const srcHeight = meta.height ?? 0;
 
     if (crop.width > srcWidth || crop.height > srcHeight) {
@@ -30,13 +33,11 @@ export async function resizeImage({ filePath, resize = null, crop = null, verbos
       );
     }
 
-    const left = Math.floor((srcWidth  - crop.width)  / 2);
-    const top  = Math.floor((srcHeight - crop.height) / 2);
+    const left = Math.floor((srcWidth - crop.width) / 2);
+    const top = Math.floor((srcHeight - crop.height) / 2);
 
     if (verbose) {
-      process.stderr.write(
-        `Cropping to ${crop.width}x${crop.height} (offset ${left},${top})...\n`
-      );
+      process.stderr.write(`Cropping to ${crop.width}x${crop.height} (offset ${left},${top})...\n`);
     }
 
     pipeline = pipeline.extract({ left, top, width: crop.width, height: crop.height });
@@ -50,6 +51,5 @@ export async function resizeImage({ filePath, resize = null, crop = null, verbos
   }
 
   const buffer = await pipeline.toBuffer();
-  const { writeFile } = await import("node:fs/promises");
   await writeFile(filePath, buffer);
 }

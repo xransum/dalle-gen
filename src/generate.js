@@ -1,17 +1,8 @@
 import OpenAI from "openai";
-import fs from "fs";
-import path from "path";
-import https from "https";
-
-/** @type {Record<string, string[]>} */
-const VALID_SIZES = {
-  "dall-e-3": ["1024x1024", "1792x1024", "1024x1792"],
-  "dall-e-2": ["256x256", "512x512", "1024x1024"],
-};
-
-const VALID_MODELS = ["dall-e-2", "dall-e-3"];
-const VALID_QUALITIES = ["standard", "hd"];
-const VALID_STYLES = ["vivid", "natural"];
+import { createWriteStream, mkdirSync, unlink } from "node:fs";
+import { resolve, dirname } from "node:path";
+import https from "node:https";
+import { VALID_SIZES, VALID_MODELS, VALID_QUALITIES, VALID_STYLES } from "./constants.js";
 
 /**
  * Download a URL to a file path.
@@ -27,12 +18,14 @@ function downloadFile(url, dest) {
       return;
     }
 
-    const file = fs.createWriteStream(dest);
+    const file = createWriteStream(dest);
 
     const cleanup = () => {
       file.close();
-      fs.unlink(dest, (e) => {
-        if (e) {process.stderr.write(`Warning: could not remove partial file: ${e.message}\n`);}
+      unlink(dest, (e) => {
+        if (e) {
+          process.stderr.write(`Warning: could not remove partial file: ${e.message}\n`);
+        }
       });
     };
 
@@ -79,8 +72,12 @@ export async function generateImage(options) {
     verbose = false,
   } = options;
 
-  if (!prompt) {throw new Error("A prompt is required.");}
-  if (!output) {throw new Error("An output path is required (--output).");}
+  if (!prompt) {
+    throw new Error("A prompt is required.");
+  }
+  if (!output) {
+    throw new Error("An output path is required (--output).");
+  }
 
   if (!VALID_MODELS.includes(model)) {
     throw new Error(`Invalid model "${model}". Valid options: ${VALID_MODELS.join(", ")}.`);
@@ -100,9 +97,7 @@ export async function generateImage(options) {
       );
     }
     if (!VALID_STYLES.includes(style)) {
-      throw new Error(
-        `Invalid style "${style}". Valid options: ${VALID_STYLES.join(", ")}.`
-      );
+      throw new Error(`Invalid style "${style}". Valid options: ${VALID_STYLES.join(", ")}.`);
     }
   }
 
@@ -138,9 +133,9 @@ export async function generateImage(options) {
     throw new Error("OpenAI returned no image URL.");
   }
 
-  const destPath = path.resolve(output);
-  const outputDir = path.dirname(destPath);
-  fs.mkdirSync(outputDir, { recursive: true });
+  const destPath = resolve(output);
+  const outputDir = dirname(destPath);
+  mkdirSync(outputDir, { recursive: true });
 
   if (verbose) {
     process.stderr.write(`Saving image to ${destPath}...\n`);
