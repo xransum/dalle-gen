@@ -92,7 +92,8 @@ jobs:
           git add package.json
           git commit -m "chore: release ${TAG}"
           git tag "${TAG}"
-          git push origin main --follow-tags
+          git push origin main
+          git push origin "${TAG}"
 
           # Create GitHub Release.
           NOTES=$(git log --format="- %s" "${LAST_TAG}..HEAD~1")
